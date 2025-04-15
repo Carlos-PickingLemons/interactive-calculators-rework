@@ -1,0 +1,66 @@
+/* Estilos para la administración de Interactive Calculators */
+
+ .wrap .card {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    margin-top: 20px;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.wrap h2 {
+    margin-top: 0;
+    color: #0073aa;
+}
+
+/* Estilos para futuras calculadoras */
+.calculator-container {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 25px;
+    margin: 20px 0;
+    border: 1px solid #e5e5e5;
+}
+
+.calculator-title {
+    font-size: 1.5em;
+    margin-bottom: 15px;
+    color: #23282d;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 10px;
+}
+
+/* Estilos específicos para la tabla de calculadoras */
+.wp-list-table .column-name {
+    width: 30%;
+}
+
+.wp-list-table .column-type {
+    width: 20%;
+}
+
+.wp-list-table .column-shortcode {
+    width: 30%;
+}
+
+.wp-list-table .column-created {
+    width: 15%;
+}
+
+/* Estilo para el botón de copiar shortcode */
+.copy-shortcode {
+    margin-left: 5px;
+    color: #0073aa;
+    vertical-align: middle;
+}
+
+.copy-shortcode:hover {
+    color: #00a0d2;
+}
+
+.copy-shortcode .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
