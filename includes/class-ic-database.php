@@ -47,17 +47,18 @@ class IC_Database
 
 		// Tabla de calculadoras
 		$sql_calculators = "CREATE TABLE {$this->calculators_table} (
-            id mediumint(9) NOT NULL AUTO_INCREMENT,
-            name varchar(100) NOT NULL,
-            type varchar(50) NOT NULL,
-            description text,
-            fields longtext,
-            settings longtext,
-            shortcode varchar(50) NOT NULL,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
-            PRIMARY KEY  (id)
-        ) $charset_collate;";
+			id mediumint(9) NOT NULL AUTO_INCREMENT,
+			name varchar(100) NOT NULL,
+			type varchar(50) NOT NULL,
+			description text,
+			fields longtext,
+			settings longtext,
+			shortcode varchar(50) NOT NULL,
+			page_id mediumint(9) DEFAULT 0,
+			created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
+			updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
+			PRIMARY KEY  (id)
+		) $charset_collate;";
 
 		// Tabla de leads
 		$sql_leads = "CREATE TABLE {$this->leads_table} (
@@ -77,6 +78,38 @@ class IC_Database
 		dbDelta($sql_calculators);
 		dbDelta($sql_leads);
 		add_option('ic_db_version', IC_PLUGIN_VERSION);
+	}
+
+	/**
+	 * Actualizar la estructura de la base de datos si es necesario
+	 */
+	public function update_database()
+	{
+		$current_version = get_option('ic_db_version', '0.0.0');
+
+		// Si ya estamos en la versión actual, no hacer nada
+		if (version_compare($current_version, IC_PLUGIN_VERSION, '>=')) {
+			return;
+		}
+
+		global $wpdb;
+
+		// Si estamos actualizando desde una versión anterior a la 1.0.0
+		if (version_compare($current_version, '1.0.0', '<')) {
+			// Comprobar si la tabla existe
+			if ($wpdb->get_var("SHOW TABLES LIKE '{$this->calculators_table}'") === $this->calculators_table) {
+				// Comprobar si la columna page_id ya existe
+				$columns = $wpdb->get_results("SHOW COLUMNS FROM {$this->calculators_table} LIKE 'page_id'");
+
+				if (empty($columns)) {
+					// Añadir la columna page_id
+					$wpdb->query("ALTER TABLE {$this->calculators_table} ADD COLUMN page_id mediumint(9) DEFAULT 0");
+				}
+			}
+		}
+
+		// Actualizar la versión de la base de datos
+		update_option('ic_db_version', IC_PLUGIN_VERSION);
 	}
 
 	/**
@@ -204,11 +237,12 @@ class IC_Database
 			$insert_data['shortcode']
 		));
 
+		$this->create_calculator_page($wpdb->insert_id, $data);
+
 		return $result !== false ? $wpdb->insert_id : false;
 	}
 
-	/**
-	 * Eliminar una calculadora
+	/**	 * Eliminar una calculadora
 	 *
 	 * @param int $id ID de la calculadora
 	 * @return bool Éxito o fracaso
@@ -216,13 +250,31 @@ class IC_Database
 	public function delete_calculator($id)
 	{
 		global $wpdb;
-		return $wpdb->delete(
+
+		// Obtener la página asociada antes de eliminar
+		$calculator = $this->get_calculator($id);
+
+		$result = $wpdb->delete(
 			$this->calculators_table,
 			['id' => $id],
 			['%d']
 		);
+
+		// Si la eliminación fue exitosa y había una página asociada, eliminarla
+		if ($result !== false && !empty($calculator['page_id'])) {
+			wp_delete_post($calculator['page_id'], true); // true para bypass papelera
+		}
+
+		return $result;
 	}
 
+	/**
+	 * Actualizar una calculadora existente
+	 *
+	 * @param int $id ID de la calculadora
+	 * @param array $data Datos a actualizar
+	 * @return bool Éxito o fracaso
+	 */
 	/**
 	 * Actualizar una calculadora existente
 	 *
@@ -281,6 +333,11 @@ class IC_Database
 			$formats,
 			['%d']
 		);
+
+		if ($result !== false) {
+			// Actualizar o crear la página correspondiente
+			$this->create_calculator_page($id, $data);
+		}
 
 		return $result !== false;
 	}
@@ -354,5 +411,102 @@ class IC_Database
 		}
 
 		return (int) $wpdb->get_var($sql);
+	}
+
+
+	/**
+	 * Crear o actualizar la página de una calculadora
+	 *
+	 * @param int $calculator_id ID de la calculadora
+	 * @param array $data Datos de la calculadora
+	 * @return int|false ID de la página o false en caso de error
+	 */
+	public function create_calculator_page($calculator_id, $data)
+	{
+		if (empty($data['name']) || empty($data['shortcode'])) {
+			return false;
+		}
+
+		$calculator_name = sanitize_text_field($data['name']);
+		$calculator_slug = sanitize_title($data['shortcode']);
+		$calculator_description = isset($data['description']) ? wp_kses_post($data['description']) : '';
+
+		// 1. Asegurarse de que existe la página padre "calculadoras"
+		$parent = get_page_by_path('calculadoras', OBJECT, 'page');
+		error_log(print_r($parent, true));
+		if (!$parent) {
+ 			$parent_id = wp_insert_post([
+				'post_title'    => 'Calculadoras Interactivas',
+				'post_name'     => 'calculadoras',
+				'post_status'   => 'publish',
+				'post_type'     => 'page',
+				'post_content'  => '<!-- Página principal de calculadoras interactivas -->',
+			]);
+
+			if (is_wp_error($parent_id)) {
+				return false;
+			}
+		} else {
+			$parent_id = $parent->ID;
+		}
+
+		// 2. Comprobar si ya existe una subpágina con ese slug
+		$page_path = 'calculadoras/' . $calculator_slug;
+		$existing_page = get_page_by_path($page_path, OBJECT, 'page');
+
+		// Preparar el contenido de la página con el shortcode
+		$shortcode = '[interactive_calculator id="' . $calculator_id . '"]';
+
+		$content = '';
+		if (!empty($calculator_description)) {
+			$content .= '<div class="calculator-description">' . $calculator_description . '</div>';
+		}
+		$content .= '<!-- Calculadora Interactiva -->' . "\n";
+		$content .= $shortcode;
+
+		if ($existing_page) {
+			// Actualizar la página existente
+			$page_data = [
+				'ID'            => $existing_page->ID,
+				'post_title'    => $calculator_name,
+				'post_content'  => $content,
+				'post_status'   => 'publish',
+			];
+
+			$page_id = wp_update_post($page_data);
+		} else {
+			// Crear una nueva página
+			$page_data = [
+				'post_title'    => $calculator_name,
+				'post_name'     => $calculator_slug,
+				'post_content'  => $content,
+				'post_status'   => 'publish',
+				'post_type'     => 'page',
+				'post_parent'   => $parent_id,
+			];
+
+			$page_id = wp_insert_post($page_data);
+		}
+
+		if (is_wp_error($page_id) || $page_id === 0) {
+			return false;
+		}
+
+		// Actualizar la relación con la calculadora
+		global $wpdb;
+		$result = $wpdb->update(
+			$this->calculators_table,
+			['page_id' => $page_id],
+			['id' => $calculator_id],
+			['%d'],
+			['%d']
+		);
+
+		if ($result === false) {
+			// Si falla la actualización, registrar el error pero no afectar al usuario
+			error_log('Error al actualizar la relación calculadora-página. Calculadora ID: ' . $calculator_id . ', Página ID: ' . $page_id);
+		}
+
+		return $page_id;
 	}
 }

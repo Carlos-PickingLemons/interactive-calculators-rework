@@ -67,11 +67,17 @@ class Main
 		// Cargar traducciones
 		load_plugin_textdomain('interactive-calculators', false, dirname(plugin_basename(IC_PLUGIN_FILE)) . '/languages');
 
+		// Actualizar base de datos si es necesario
+		$this->database->update_database();
+
 		// Registrar menús de administración
 		add_action('admin_menu', array($this, 'register_admin_menu'));
 
 		// Registrar assets
 		add_action('admin_enqueue_scripts', array($this, 'register_admin_assets'));
+
+		// Registrar shortcode para mostrar calculadoras
+		add_shortcode('interactive_calculator', array($this, 'render_calculator_shortcode'));
 	}
 
 	/**
@@ -225,6 +231,51 @@ class Main
 	}
 
 	/**
+	 * Renderiza el shortcode de calculadora
+	 *
+	 * @param array $atts Atributos del shortcode
+	 * @return string HTML de la calculadora
+	 */
+	public function render_calculator_shortcode($atts)
+	{
+		$atts = shortcode_atts(
+			array(
+				'id' => 0,
+			),
+			$atts,
+			'interactive_calculator'
+		);
+
+		$calculator_id = intval($atts['id']);
+		if ($calculator_id <= 0) {
+			return '<p class="calculator-error">' . __('Error: ID de calculadora no válido.', 'interactive-calculators') . '</p>';
+		}
+
+		// Obtener datos de la calculadora
+		$calculator = $this->database->get_calculator($calculator_id);
+		if (!$calculator) {
+			return '<p class="calculator-error">' . __('Error: Calculadora no encontrada.', 'interactive-calculators') . '</p>';
+		}
+
+		// Obtener campos y configuración
+		$fields = json_decode($calculator['fields'], true);
+		$settings = json_decode($calculator['settings'], true);
+
+		if (!is_array($fields) || !is_array($settings)) {
+			return '<p class="calculator-error">' . __('Error: Datos de calculadora inválidos.', 'interactive-calculators') . '</p>';
+		}
+
+		// Iniciar el buffer de salida
+		ob_start();
+
+		// Incluir la vista de la calculadora en el frontend
+		include IC_PLUGIN_DIR . 'public/views/calculator.php';
+
+		// Devolver el contenido del buffer
+		return ob_get_clean();
+	}
+
+	/**
 	 * Registrar scripts y estilos para administración
 	 */
 	public function register_admin_assets($hook)
@@ -317,10 +368,6 @@ class Main
 		$shortcode = isset($_POST['calculator_shortcode']) ? sanitize_title($_POST['calculator_shortcode']) : '';
 		$fields = isset($_POST['calculator_fields']) ? stripslashes($_POST['calculator_fields']) : '[]';
 
-		if (empty($fields) || $fields === '[]') {
-			$fields = '[{"name":"campo1","label":"Campo 1","type":"number","required":true,"placeholder":"Ingrese un valor","default":"0"}]';
-		}
-
 		// Escapar caracteres problemáticos
 		$fields = str_replace("\\", "\\\\", $fields);
 		$settings_json = isset($_POST['calculator_settings']) ? $_POST['calculator_settings'] : '{}';
@@ -383,6 +430,10 @@ class Main
 	{
 		// Instalar tablas de base de datos
 		$this->database->install();
+
+		// Actualizar la estructura si es necesario
+		$this->database->update_database();
+
 		flush_rewrite_rules();
 	}
 
