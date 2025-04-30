@@ -1,29 +1,26 @@
 <?php
-
 /**
  * Clase principal del plugin Interactive Calculators
  *
  * @package Interactive_Calculators
  */
 
-if (!defined('ABSPATH')) {
-	exit;
-}
+namespace InteractiveCalculators\Core;
 
 /**
  * Clase principal del plugin
  */
-class Main
+class Plugin
 {
 	/**
 	 * Instancia única de esta clase (patrón Singleton)
-	 * @var Main
+	 * @var Plugin
 	 */
 	private static $instance = null;
 
 	/**
 	 * Instancia de la clase de base de datos
-	 * @var IC_Database
+	 * @var Database
 	 */
 	private $database;
 
@@ -33,25 +30,25 @@ class Main
 	private function __construct()
 	{
 		// Inicializar la base de datos
-		$this->database = new IC_Database();
+		$this->database = new Database();
 
 		// Hacer la instancia de la bases de datos disponible globalmente
 		global $ic_database;
 		$ic_database = $this->database;
 
 		// Hooks de activación y desactivación
-		register_activation_hook(IC_PLUGIN_FILE, array($this, 'activate'));
-		register_deactivation_hook(IC_PLUGIN_FILE, array($this, 'deactivate'));
+		register_activation_hook(IC_PLUGIN_FILE, [$this,  'activate']);
+		register_deactivation_hook(IC_PLUGIN_FILE, [$this, 'deactivate']);
 
 		// Inicializar el plugin
-		add_action('plugins_loaded', array($this, 'init'));
+		add_action('plugins_loaded', [$this, 'init']);
 	}
 
 	/**
 	 * Obtener la instancia única de la clase (Singleton)
-	 * @return Main
+	 * @return Plugin
 	 */
-	public static function get_instance(): Main
+	public static function get_instance(): Plugin
 	{
 		if (null === self::$instance) {
 			self::$instance = new self();

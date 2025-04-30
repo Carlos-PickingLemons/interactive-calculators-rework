@@ -1,19 +1,16 @@
 <?php
-
 /**
  * Clase para la gestión de base de datos
  *
  * @package Interactive_Calculators
  */
 
-if (!defined('ABSPATH')) {
-	exit;
-}
+namespace InteractiveCalculators\Core;
 
 /**
  * Clase de base de datos para calculadoras interactivas
  */
-class IC_Database
+class Database
 {
 	/**
 	 * Nombre de la tabla de calculadoras

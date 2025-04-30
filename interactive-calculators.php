@@ -1,37 +1,30 @@
 <?php
 
 /**
- * Plugin Name:     Interactive Calculators
- * Plugin URI:      PLUGIN SITE HERE
+ * Plugin Name:     Interactive Calculators Rework
  * Description:     Engagement tools for lead generation through interactive calculators
  * Author:          Carlos M. Rodríguez Santana
- * Author URI:      https://picking-lemons.com
- * Text Domain:     interactive-calculators
- * Domain Path:     /languages
  * Version:         0.1.0
  *
  * @package         Interactive_Calculators
  */
 
-// Si se accede directamente, abortar
-if (!defined('ABSPATH')) {
-	exit;
-}
+use InteractiveCalculators\Core\Bootstrap;
 
-// Definir constantes del plugin
+// Protección contra el acceso directo
+if (!defined('ABSPATH')) exit;
+
+// Constantes del plugin
 define('IC_PLUGIN_FILE', __FILE__);
 define('IC_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('IC_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('IC_PLUGIN_VERSION', '1.0.0');
 
-// Incluir la clase principal del plugin
-require_once IC_PLUGIN_DIR . 'includes/class-ic-database.php';
-require_once IC_PLUGIN_DIR . 'includes/class-main.php';
+require_once IC_PLUGIN_DIR . 'src/Core/Bootstrap.php';
+$plugin = Bootstrap::init();
 
-// Inicialiar el plugin
-function ic_init(): Main {
-	return Main::get_instance();
-}
+// Registar los hooks de activación y desactivación
+register_activation_hook(IC_PLUGIN_FILE, [$plugin, 'activate']);
+register_deactivation_hook(IC_PLUGIN_FILE, [$plugin, 'deactivate']);
 
-// Iniciar el plugin
-$GLOBALS['interactive_calculators'] = ic_init();
+// Inicar el plugin cuando Wordpress esté listo
+add_action('plugins_loaded', [$plugin, 'init']);
